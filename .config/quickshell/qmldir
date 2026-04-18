@@ -1,5 +1,6 @@
 singleton Colors 1.0 Colors.qml
 singleton UIState 1.0 UIState.qml
+singleton Animations 1.0 Animations.qml
 Bar 1.0 Bar.qml
 Dashboard 1.0 Dashboard.qml
 Launcher 1.0 Launcher.qml

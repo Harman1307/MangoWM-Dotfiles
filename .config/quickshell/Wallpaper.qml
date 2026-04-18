@@ -22,9 +22,9 @@ PanelWindow {
     property bool _skipInitialAnim: true
 
     property string cachePath: Quickshell.env("HOME") + "/.cache/wallpaper-thumbs"
-    property string wallDir: Quickshell.env("HOME") + "/wallpapers"
+    property string wallDir:   Quickshell.env("HOME") + "/wallpapers"
 
-    property int sliceWidth: 58
+    property int sliceWidth:    58
     property int expandedWidth: screen ? Math.min(screen.width * 0.52, 680) : 580
 
     visible: showing
@@ -53,13 +53,13 @@ PanelWindow {
 
     onShowingChanged: {
         if (showing) {
-            query = ""
-            selected = 0
+            query       = ""
+            selected    = 0
             colorFilter = -1
-            searchInput.text = ""
-            _pendingColors = {}
-            _skipInitialAnim = true
-            ready = false
+            searchInput.text  = ""
+            _pendingColors    = {}
+            _skipInitialAnim  = true
+            ready             = false
             currentWallProc.running = true
         } else {
             ready = false
@@ -84,21 +84,21 @@ PanelWindow {
 
     Timer {
         id: enableAnimDelay
-        interval: 100
+        interval: 120
         onTriggered: _skipInitialAnim = false
     }
 
     Timer {
         id: colorFlush
         interval: 400
-        repeat: true
-        running: colorExtractProc.running
+        repeat:   true
+        running:  colorExtractProc.running
         onTriggered: {
             var keys = Object.keys(_pendingColors)
             if (keys.length === 0) return
             for (var i = 0; i < keys.length; i++)
                 wallColors[keys[i]] = _pendingColors[keys[i]]
-            wallColors = Object.assign({}, wallColors)
+            wallColors    = Object.assign({}, wallColors)
             _pendingColors = {}
         }
     }
@@ -127,46 +127,32 @@ PanelWindow {
         if (!colorString || colorString.length === 0) return -2
         var hexList = colorString.split(",")
         if (hexList.length === 0) return -2
-
-        var total = hexList.length
-        var weightedH = 0
-        var totalSat = 0
+        var total       = hexList.length
+        var weightedH   = 0
+        var totalSat    = 0
         var neutralCount = 0
-
         for (var i = 0; i < hexList.length; i++) {
-            var hex = hexList[i].trim()
+            var hex     = hexList[i].trim()
             if (hex.length < 6) continue
-            var hsl = hexToHsl(hex)
+            var hsl     = hexToHsl(hex)
             var vibrancy = hsl.s * (1 - Math.abs(2 * hsl.l - 1))
-            var weight = vibrancy
-
-            if (hsl.s < 0.08 || hsl.l < 0.04 || hsl.l > 0.96) {
-                neutralCount++
-                continue
-            }
-
-            weightedH += hsl.h * weight
-            totalSat += weight
+            if (hsl.s < 0.08 || hsl.l < 0.04 || hsl.l > 0.96) { neutralCount++; continue }
+            weightedH += hsl.h * vibrancy
+            totalSat  += vibrancy
         }
-
         if (neutralCount === total) return -1
         if (totalSat < 0.05) return -1
-
         return weightedH / totalSat
     }
 
     function matchesColor(wallName) {
         if (colorFilter < 0) return true
-        var dot = colorDots[colorFilter]
+        var dot         = colorDots[colorFilter]
         var colorString = wallColors[wallName]
         if (!colorString) return false
-
         var dominantHue = getDominantHue(colorString)
-
         if (dot.hue < 0) return dominantHue === -1
-
         if (dominantHue === -1 || dominantHue === -2) return false
-
         var diff = Math.abs(dominantHue - dot.hue)
         if (diff > 180) diff = 360 - diff
         return diff < 50
@@ -174,35 +160,27 @@ PanelWindow {
 
     function getRepresentativeColor(colorString) {
         if (!colorString || colorString.length === 0) return ""
-        var hexList = colorString.split(",")
-        var bestHex = ""
+        var hexList  = colorString.split(",")
+        var bestHex  = ""
         var bestScore = -1
-
         for (var i = 0; i < hexList.length; i++) {
-            var hex = hexList[i].trim()
+            var hex  = hexList[i].trim()
             if (hex.length < 6) continue
-            var hsl = hexToHsl(hex)
+            var hsl  = hexToHsl(hex)
             var vibrancy = hsl.s * (1 - Math.abs(2 * hsl.l - 1))
             if (hsl.s < 0.08 || hsl.l < 0.04 || hsl.l > 0.96) continue
-            if (vibrancy > bestScore) {
-                bestScore = vibrancy
-                bestHex = hex
-            }
+            if (vibrancy > bestScore) { bestScore = vibrancy; bestHex = hex }
         }
-
         if (bestHex === "") {
             var parts = colorString.split(",")
             if (parts.length > 0) bestHex = parts[0].trim()
         }
-
         return bestHex
     }
 
     function filterWalls(preserve) {
         var prevName = preserve && selected < filtered.length ? filtered[selected].name : ""
-
-        var result = walls.slice()
-
+        var result   = walls.slice()
         if (query !== "") {
             var q = query.toLowerCase()
             result = result.filter(w => w.name.toLowerCase().includes(q))
@@ -213,12 +191,9 @@ PanelWindow {
                 return a.name.length - b.name.length
             })
         }
-
         if (colorFilter >= 0)
             result = result.filter(w => matchesColor(w.name))
-
         filtered = result
-
         if (prevName) {
             for (var i = 0; i < result.length; i++) {
                 if (result[i].name === prevName) { selected = i; return }
@@ -249,7 +224,7 @@ PanelWindow {
 
     function prettyName(name) {
         var dot = name.lastIndexOf(".")
-        var n = dot > 0 ? name.substring(0, dot) : name
+        var n   = dot > 0 ? name.substring(0, dot) : name
         return n.replace(/[-_]/g, " ")
     }
 
@@ -278,15 +253,15 @@ PanelWindow {
             splitMarker: ""
             onRead: data => {
                 try {
-                    var arr = JSON.parse(data.trim())
+                    var arr    = JSON.parse(data.trim())
                     var result = []
                     for (var i = 0; i < arr.length; i++) {
                         result.push({ name: arr[i].name })
                         if (arr[i].color) wallColors[arr[i].name] = arr[i].color
                     }
-                    walls = result
-                    wallColors = Object.assign({}, wallColors)
-                    filtered = walls.slice()
+                    walls        = result
+                    wallColors   = Object.assign({}, wallColors)
+                    filtered     = walls.slice()
                     thumbVersion = 1
                 } catch(e) {}
             }
@@ -334,7 +309,7 @@ PanelWindow {
             }
         }
         onExited: {
-            var seen = {}
+            var seen   = {}
             var result = []
             for (var i = 0; i < _wallsBuild.length; i++) {
                 if (!seen[_wallsBuild[i].name]) {
@@ -342,10 +317,9 @@ PanelWindow {
                     result.push(_wallsBuild[i])
                 }
             }
-            walls = result
+            walls      = result
             wallColors = Object.assign({}, wallColors)
             _wallsBuild = []
-
             if (ready) {
                 filterWalls(true)
             } else {
@@ -353,7 +327,6 @@ PanelWindow {
                 selectCurrentWall()
                 listReadyDelay.start()
             }
-
             writeCache()
             colorExtractProc.running = true
         }
@@ -431,19 +404,31 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: ready ? Math.min(parent.width - 40, 1200) : 300
-        height: ready ? Math.min(parent.height - 70, 580) : 60
+        width:   ready ? Math.min(parent.width - 40, 1200) : 280
+        height:  ready ? Math.min(parent.height - 70, 580) : 52
         anchors.centerIn: parent
-        radius: 22
-        color: a(Colors.bg, UIState.transparencyEnabled ? 0.92 : 1)
+        radius:  22
+        color:   a(Colors.bg, UIState.transparencyEnabled ? 0.92 : 1)
         border.width: 1
         border.color: a(Colors.fg, 0.08)
         opacity: ready ? 1 : 0
+        scale:   ready ? 1 : Animations.enterScale
 
-        Behavior on width { NumberAnimation { duration: 500; easing.type: Easing.OutExpo } }
-        Behavior on height { NumberAnimation { duration: 400; easing.type: Easing.OutExpo } }
-        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-        Behavior on color { ColorAnimation { duration: 300 } }
+        Behavior on width {
+            NumberAnimation { duration: Animations.xslow; easing.type: Easing.OutExpo }
+        }
+        Behavior on height {
+            NumberAnimation { duration: Animations.slow; easing.type: Easing.OutExpo }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: Animations.slow; easing.type: Easing.OutBack; easing.overshoot: Animations.springPower }
+        }
+        Behavior on color {
+            ColorAnimation { duration: Animations.slow }
+        }
 
         Item {
             anchors.fill: parent
@@ -451,37 +436,39 @@ PanelWindow {
             opacity: ready ? 1 : 0
             visible: opacity > 0
 
-            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on opacity {
+                NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+            }
 
             Item {
                 id: topRow
-                width: parent.width
+                width:  parent.width
                 height: 40
 
                 Rectangle {
-                    width: Math.min(parent.width * 0.25, 220)
+                    width:  Math.min(parent.width * 0.25, 220)
                     height: 36
                     radius: 18
-                    color: a(Colors.surface, 0.6)
+                    color:  a(Colors.surface, 0.6)
                     border.width: searchInput.activeFocus ? 1.5 : 0
                     border.color: a(Colors.accent, 0.5)
                     anchors { left: parent.left; verticalCenter: parent.verticalCenter }
 
-                    Behavior on border.width { NumberAnimation { duration: 150 } }
-                    Behavior on border.color { ColorAnimation { duration: 200 } }
+                    Behavior on border.width { NumberAnimation { duration: Animations.fast } }
+                    Behavior on border.color { ColorAnimation  { duration: Animations.fast } }
 
                     Row {
                         anchors.fill: parent
-                        anchors.leftMargin: 14
+                        anchors.leftMargin:  14
                         anchors.rightMargin: 14
                         spacing: 8
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: ""
+                            text:  ""
                             color: searchInput.activeFocus ? Colors.accent : a(Colors.fg, 0.3)
                             font { pixelSize: 12; family: "JetBrainsMono Nerd Font" }
-                            Behavior on color { ColorAnimation { duration: 200 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         TextInput {
@@ -496,9 +483,9 @@ PanelWindow {
                             Text {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "Search..."
-                                color: a(Colors.fg, 0.2)
-                                font: parent.font
+                                text:    "Search..."
+                                color:   a(Colors.fg, 0.2)
+                                font:    parent.font
                                 visible: !parent.text && !parent.activeFocus
                             }
 
@@ -538,11 +525,12 @@ PanelWindow {
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "󰅖"
-                            color: clrMa.containsMouse ? Colors.fg : a(Colors.fg, 0.3)
+                            text:    "󰅖"
+                            color:   clrMa.containsMouse ? Colors.fg : a(Colors.fg, 0.3)
                             font { pixelSize: 10; family: "JetBrainsMono Nerd Font" }
                             visible: searchInput.text.length > 0
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+
                             MouseArea {
                                 id: clrMa
                                 anchors.fill: parent; anchors.margins: -6
@@ -567,15 +555,20 @@ PanelWindow {
 
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: colorFilter === parent.index ? 18 : cdMa.containsMouse ? 14 : 10
-                                height: width; radius: width / 2
-                                color: parent.modelData.color
+                                width:  colorFilter === parent.index ? 18 : cdMa.containsMouse ? 14 : 10
+                                height: width
+                                radius: width / 2
+                                color:  parent.modelData.color
                                 opacity: colorFilter === parent.index ? 1 : cdMa.containsMouse ? 0.85 : 0.5
                                 border.width: colorFilter === parent.index ? 2 : 0
                                 border.color: Colors.fg
 
-                                Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutBack; easing.overshoot: 2.5 } }
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                Behavior on width {
+                                    NumberAnimation { duration: Animations.medium; easing.type: Easing.OutBack; easing.overshoot: Animations.springPower }
+                                }
+                                Behavior on opacity {
+                                    NumberAnimation { duration: Animations.fast }
+                                }
                             }
 
                             MouseArea {
@@ -597,7 +590,7 @@ PanelWindow {
                     spacing: 6
 
                     Text {
-                        text: filtered.length + ""
+                        text:  filtered.length + ""
                         color: a(Colors.fg, 0.35)
                         font { pixelSize: 11; family: "JetBrainsMono Nerd Font"; bold: true }
                         anchors.verticalCenter: parent.verticalCenter
@@ -605,26 +598,28 @@ PanelWindow {
 
                     Text {
                         visible: filtered.length !== walls.length
-                        text: "/ " + walls.length
-                        color: a(Colors.fg, 0.2)
+                        text:    "/ " + walls.length
+                        color:   a(Colors.fg, 0.2)
                         font { pixelSize: 10; family: "JetBrainsMono Nerd Font" }
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
                     Rectangle {
-                        width: 28; height: 28; radius: 14
+                        width:   28; height: 28; radius: 14
                         anchors.verticalCenter: parent.verticalCenter
-                        color: shuffleMa.containsMouse ? a(Colors.accent, 0.15) : "transparent"
+                        color:   shuffleMa.containsMouse ? a(Colors.accent, 0.15) : "transparent"
                         visible: filtered.length > 1
+                        scale:   shuffleMa.pressed ? 0.88 : 1
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on color { ColorAnimation  { duration: Animations.fast } }
+                        Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                         Text {
                             anchors.centerIn: parent
-                            text: "󰒝"
+                            text:  "󰒝"
                             color: shuffleMa.containsMouse ? Colors.accent : a(Colors.fg, 0.3)
                             font { pixelSize: 13; family: "JetBrainsMono Nerd Font" }
-                            Behavior on color { ColorAnimation { duration: 150 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         MouseArea {
@@ -651,11 +646,11 @@ PanelWindow {
                     clip: true
                     boundsBehavior: Flickable.StopAtBounds
                     currentIndex: selected
-                    highlightMoveDuration: _skipInitialAnim ? 0 : 350
+                    highlightMoveDuration:  _skipInitialAnim ? 0 : Animations.medium
                     highlightMoveVelocity: -1
                     highlightRangeMode: ListView.StrictlyEnforceRange
                     preferredHighlightBegin: (width - expandedWidth) / 2
-                    preferredHighlightEnd: (width + expandedWidth) / 2
+                    preferredHighlightEnd:   (width + expandedWidth) / 2
                     highlight: Item {}
                     cacheBuffer: 1500
 
@@ -672,37 +667,44 @@ PanelWindow {
                                 if (selected < filtered.length - 1) selected++
                             }
                         }
-                        onPressed: function(mouse) { mouse.accepted = false }
+                        onPressed:  function(mouse) { mouse.accepted = false }
                         onReleased: function(mouse) { mouse.accepted = false }
-                        onClicked: function(mouse) { mouse.accepted = false }
+                        onClicked:  function(mouse) { mouse.accepted = false }
                     }
 
                     delegate: Item {
                         id: sliceItem
                         required property int index
                         required property var modelData
+
                         property bool isCurrent: index === selected
-                        property bool isActive: modelData.name === currentWall
+                        property bool isActive:  modelData.name === currentWall
                         property bool isHovered: sliceMa.containsMouse
-                        property bool isGif: modelData.name.toLowerCase().endsWith(".gif")
+                        property bool isGif:     modelData.name.toLowerCase().endsWith(".gif")
                         property real cardRadius: isCurrent ? 18 : 12
 
                         property bool fullLoaded: fullLoader.item ? fullLoader.item.status === Image.Ready : false
-                        property bool gifLoaded: gifLoader.item ? gifLoader.item.status === Image.Ready : false
+                        property bool gifLoaded:  gifLoader.item  ? gifLoader.item.status  === Image.Ready : false
 
-                        width: isCurrent ? expandedWidth : sliceWidth
+                        width:  isCurrent ? expandedWidth : sliceWidth
                         height: sliceList.height
 
-                        Behavior on width { NumberAnimation { duration: 350; easing.type: Easing.OutCubic } }
+                        Behavior on width {
+                            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+                        }
 
                         Item {
                             id: sliceCard
                             anchors.fill: parent
-                            anchors.topMargin: sliceItem.isCurrent ? 0 : 10
-                            anchors.bottomMargin: sliceItem.isCurrent ? 0 : 10
+                            anchors.topMargin:    sliceItem.isCurrent ? 0 : 12
+                            anchors.bottomMargin: sliceItem.isCurrent ? 0 : 12
 
-                            Behavior on anchors.topMargin { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
-                            Behavior on anchors.bottomMargin { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+                            Behavior on anchors.topMargin {
+                                NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+                            }
+                            Behavior on anchors.bottomMargin {
+                                NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+                            }
 
                             Item {
                                 id: wallContent
@@ -714,7 +716,7 @@ PanelWindow {
                                     anchors.fill: parent
                                     source: thumbVersion > 0
                                         ? "file://" + cachePath + "/" + sliceItem.modelData.name + ".thumb.jpg"
-                                        : "file://" + wallDir + "/" + sliceItem.modelData.name
+                                        : "file://" + wallDir   + "/" + sliceItem.modelData.name
                                     onStatusChanged: {
                                         if (status === Image.Error)
                                             source = "file://" + wallDir + "/" + sliceItem.modelData.name
@@ -770,10 +772,10 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: sliceItem.cardRadius
-                                color: sliceItem.isCurrent ? "transparent"
-                                     : sliceItem.isHovered ? a("#000", 0.15)
-                                     : a("#000", 0.55)
-                                Behavior on color { ColorAnimation { duration: 200 } }
+                                color: sliceItem.isCurrent  ? "transparent"
+                                     : sliceItem.isHovered  ? a("#000", 0.12)
+                                     : a("#000", 0.52)
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             Rectangle {
@@ -781,9 +783,11 @@ PanelWindow {
                                 anchors { top: parent.top; horizontalCenter: parent.horizontalCenter; topMargin: 8 }
                                 width: 18; height: 18; radius: 9
                                 color: Colors.green
+
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "󰄬"; color: "#000"
+                                    text:  "󰄬"
+                                    color: "#000"
                                     font { pixelSize: 9; family: "JetBrainsMono Nerd Font" }
                                 }
                             }
@@ -795,6 +799,16 @@ PanelWindow {
 
                                 sourceComponent: Item {
                                     anchors.fill: parent
+                                    opacity: 0
+
+                                    Component.onCompleted: infoFade.start()
+
+                                    NumberAnimation {
+                                        id: infoFade
+                                        target: parent; property: "opacity"
+                                        from: 0; to: 1
+                                        duration: Animations.medium; easing.type: Easing.OutCubic
+                                    }
 
                                     Rectangle {
                                         anchors.fill: parent
@@ -816,10 +830,10 @@ PanelWindow {
                                             spacing: 10
 
                                             Rectangle {
-                                                width: 12; height: 12; radius: 6
+                                                width:  12; height: 12; radius: 6
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 color: {
-                                                    var cs = wallColors[sliceItem.modelData.name]
+                                                    var cs  = wallColors[sliceItem.modelData.name]
                                                     var rep = getRepresentativeColor(cs)
                                                     return rep.length > 3 ? rep : a("#fff", 0.3)
                                                 }
@@ -832,7 +846,7 @@ PanelWindow {
                                                 spacing: 2
 
                                                 Text {
-                                                    text: prettyName(sliceItem.modelData.name)
+                                                    text:  prettyName(sliceItem.modelData.name)
                                                     color: "#fff"
                                                     font { pixelSize: 13; family: "JetBrainsMono Nerd Font"; bold: true }
                                                     width: Math.min(implicitWidth, expandedWidth - 220)
@@ -843,7 +857,7 @@ PanelWindow {
                                                     spacing: 8
                                                     Text {
                                                         text: {
-                                                            var n = sliceItem.modelData.name
+                                                            var n   = sliceItem.modelData.name
                                                             var dot = n.lastIndexOf(".")
                                                             return dot > 0 ? n.substring(dot + 1).toUpperCase() : ""
                                                         }
@@ -852,14 +866,14 @@ PanelWindow {
                                                     }
                                                     Text {
                                                         visible: sliceItem.isGif
-                                                        text: "GIF"
-                                                        color: Colors.accent
+                                                        text:    "GIF"
+                                                        color:   Colors.accent
                                                         font { pixelSize: 9; family: "JetBrainsMono Nerd Font"; bold: true }
                                                     }
                                                     Text {
                                                         visible: sliceItem.isActive
-                                                        text: "current"
-                                                        color: Colors.green
+                                                        text:    "current"
+                                                        color:   Colors.green
                                                         font { pixelSize: 9; family: "JetBrainsMono Nerd Font"; bold: true }
                                                     }
                                                 }
@@ -868,16 +882,20 @@ PanelWindow {
 
                                         Rectangle {
                                             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                                            width: applyContent.width + 24
+                                            width:  applyContent.width + 24
                                             height: 30; radius: 15
-                                            color: sliceItem.isActive ? a(Colors.green, 0.15)
-                                                 : applyBtnMa.containsMouse ? a(Colors.accent, 0.25) : a("#fff", 0.08)
+                                            color:  sliceItem.isActive
+                                                ? a(Colors.green, 0.15)
+                                                : applyBtnMa.containsMouse ? a(Colors.accent, 0.25) : a("#fff", 0.08)
                                             border.width: 1
-                                            border.color: sliceItem.isActive ? a(Colors.green, 0.35)
-                                                         : applyBtnMa.containsMouse ? a(Colors.accent, 0.35) : a("#fff", 0.08)
+                                            border.color: sliceItem.isActive
+                                                ? a(Colors.green, 0.35)
+                                                : applyBtnMa.containsMouse ? a(Colors.accent, 0.35) : a("#fff", 0.08)
+                                            scale: applyBtnMa.pressed ? 0.92 : 1
 
-                                            Behavior on color { ColorAnimation { duration: 150 } }
-                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                            Behavior on color        { ColorAnimation  { duration: Animations.fast } }
+                                            Behavior on border.color { ColorAnimation  { duration: Animations.fast } }
+                                            Behavior on scale        { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                                             Row {
                                                 id: applyContent
@@ -885,19 +903,19 @@ PanelWindow {
                                                 spacing: 6
 
                                                 Text {
-                                                    text: sliceItem.isActive ? "󰄬" : "󰸉"
+                                                    text:  sliceItem.isActive ? "󰄬" : "󰸉"
                                                     color: sliceItem.isActive ? Colors.green : applyBtnMa.containsMouse ? Colors.accent : a("#fff", 0.6)
                                                     font { pixelSize: 13; family: "JetBrainsMono Nerd Font" }
                                                     anchors.verticalCenter: parent.verticalCenter
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                                 }
 
                                                 Text {
-                                                    text: sliceItem.isActive ? "Active" : "Apply"
+                                                    text:  sliceItem.isActive ? "Active" : "Apply"
                                                     color: sliceItem.isActive ? Colors.green : applyBtnMa.containsMouse ? Colors.accent : a("#fff", 0.6)
                                                     font { pixelSize: 10; family: "JetBrainsMono Nerd Font"; bold: true }
                                                     anchors.verticalCenter: parent.verticalCenter
-                                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                                 }
                                             }
 
@@ -918,13 +936,14 @@ PanelWindow {
                             Rectangle {
                                 anchors.fill: parent
                                 radius: sliceItem.cardRadius
-                                color: "transparent"
+                                color:  "transparent"
                                 border.width: sliceItem.isCurrent ? 2 : sliceItem.isActive ? 1.5 : sliceItem.isHovered ? 1 : 0
                                 border.color: sliceItem.isCurrent ? Colors.accent
-                                             : sliceItem.isActive ? Colors.green
-                                             : a("#fff", 0.3)
-                                Behavior on border.width { NumberAnimation { duration: 200 } }
-                                Behavior on border.color { ColorAnimation { duration: 200 } }
+                                            : sliceItem.isActive  ? Colors.green
+                                            : a("#fff", 0.3)
+
+                                Behavior on border.width { NumberAnimation { duration: Animations.fast } }
+                                Behavior on border.color { ColorAnimation  { duration: Animations.fast } }
                             }
                         }
 
@@ -968,14 +987,14 @@ PanelWindow {
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: walls.length === 0 ? "󰔟" : "󰈭"
+                        text:  walls.length === 0 ? "󰔟" : "󰈭"
                         color: a(Colors.fg, 0.12)
                         font { pixelSize: 40; family: "JetBrainsMono Nerd Font" }
                     }
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: walls.length === 0 ? "Scanning wallpapers..." : "No wallpapers match"
+                        text:  walls.length === 0 ? "Scanning wallpapers..." : "No wallpapers match"
                         color: a(Colors.fg, 0.2)
                         font { pixelSize: 12; family: "JetBrainsMono Nerd Font" }
                     }
@@ -983,10 +1002,11 @@ PanelWindow {
                     Text {
                         visible: colorFilter >= 0
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: "Clear filter"
+                        text:  "Clear filter"
                         color: cfMa.containsMouse ? Colors.accent : a(Colors.accent, 0.5)
                         font { pixelSize: 11; family: "JetBrainsMono Nerd Font" }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
+
                         MouseArea {
                             id: cfMa
                             anchors.fill: parent; anchors.margins: -8

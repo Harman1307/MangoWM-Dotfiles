@@ -24,8 +24,10 @@ PanelWindow {
     property real vinylRotation: 0
     property bool vinylHeld: false
     property real dragStartPos: 0
+    property real dragStartAngle: 0
     property real lastX: 0
     property real totalDrag: 0
+    property bool wasPlaying: false
 
     property string vinylAsset: "file://" + Quickshell.env("HOME") + "/.config/quickshell/assets/Vinyl.png"
 
@@ -53,15 +55,99 @@ PanelWindow {
 
     function isVinylMode() { return displayMode === 1 }
 
-    function resumePlayback() {
+    function grabVinyl(mx) {
+        vinylSpin.stop()
+        wasPlaying     = UIState.mediaState === "playing"
+        vinylHeld      = true
+        totalDrag      = 0
+        lastX          = mx
+        dragStartPos   = UIState.mediaPos
+        dragStartAngle = vinylRotation
+        UIState.blockMediaPosUpdate = true
+        if (wasPlaying) UIState.doMedia("play-pause")
+    }
+
+    function scrubVinyl(mx) {
         if (!vinylHeld) return
-        var finalPos = Math.max(0, Math.min(UIState.mediaLen, dragStartPos + totalDrag * (UIState.mediaLen / 800)))
-        vinylHeld    = false
-        totalDrag    = 0
+        var dx    = mx - lastX
+        lastX     = mx
+        totalDrag += dx
+        vinylRotation = dragStartAngle + totalDrag * 0.8
+        var newPos = Math.max(0, Math.min(UIState.mediaLen, dragStartPos + totalDrag * (UIState.mediaLen / 600)))
+        UIState.mediaPos = newPos
+        seekDebounce.restart()
+    }
+
+    function releaseVinyl() {
+        if (!vinylHeld) return
+        seekDebounce.stop()
+        vinylHeld = false
+        var finalPos = Math.max(0, Math.min(UIState.mediaLen, dragStartPos + totalDrag * (UIState.mediaLen / 600)))
         UIState.mediaPos = finalPos
-        seekAndPlayProc.command = ["bash", "-c", "mpc seek " + Math.floor(finalPos) + " && mpc play"]
-        seekAndPlayProc.running = true
-        unblockPoll.start()
+        UIState.seekMedia(Math.floor(finalPos))
+        if (wasPlaying) resumeDelay.start()
+        else unblockPoll.start()
+    }
+
+    Timer {
+        id: resumeDelay
+        interval: 150
+        onTriggered: { UIState.doMedia("play-pause"); unblockPoll.start() }
+    }
+
+    Timer {
+        id: unblockPoll
+        interval: 2500
+        onTriggered: UIState.blockMediaPosUpdate = false
+    }
+
+    Timer {
+        id: seekDebounce
+        interval: 60
+        onTriggered: {
+            if (!vinylHeld || UIState.mediaLen <= 0) return
+            var pos = Math.floor(Math.max(0, Math.min(UIState.mediaLen, dragStartPos + totalDrag * (UIState.mediaLen / 600))))
+            UIState.seekMedia(pos)
+        }
+    }
+
+    NumberAnimation {
+        id: vinylSpin
+        target: music
+        property: "vinylRotation"
+        to: vinylRotation + 36000
+        duration: 36000 * 120
+        loops: Animation.Infinite
+        easing.type: Easing.Linear
+
+        function kickoff() {
+            stop()
+            from = vinylRotation
+            to   = vinylRotation + 36000
+            start()
+        }
+    }
+
+    Connections {
+        target: UIState
+        function onMediaStateChanged() {
+            if (UIState.mediaState === "playing" && isVinylMode() && _visible && !vinylHeld)
+                vinylSpin.kickoff()
+            else if (UIState.mediaState !== "playing")
+                vinylSpin.stop()
+        }
+    }
+
+    onShowingChanged: {
+        if (showing) {
+            _visible   = true
+            pickerOpen = false
+            pickerTab  = displayMode
+            if (displayMode === 0 && gifSource === "") reloadGif()
+            if (isVinylMode() && UIState.mediaState === "playing") vinylSpin.kickoff()
+        } else {
+            closeDelay.start()
+        }
     }
 
     function reloadGif() {
@@ -74,62 +160,20 @@ PanelWindow {
         id: gifClearDelay
         interval: 60
         onTriggered: {
-            gifSource  = "file://" + UIState._gifPath + "/current.gif"
+            gifSource   = "file://" + UIState._gifPath + "/current.gif"
             applyingGif = false
             gifReadyDelay.start()
         }
     }
 
-    Timer {
-        id: gifReadyDelay
-        interval: 80
-        onTriggered: gifReady = true
-    }
-
-    Timer {
-        id: unblockPoll
-        interval: 2500
-        onTriggered: UIState.blockMediaPosUpdate = false
-    }
-
-    onShowingChanged: {
-        if (showing) {
-            _visible   = true
-            pickerOpen = false
-            pickerTab  = displayMode
-            if (displayMode === 0 && gifSource === "") reloadGif()
-        } else {
-            closeDelay.start()
-        }
-    }
+    Timer { id: gifReadyDelay; interval: 80; onTriggered: gifReady = true }
 
     Timer {
         id: closeDelay
-        interval: 300
-        onTriggered: { _visible = false; pickerOpen = false }
+        interval: Animations.exitDuration + 60
+        onTriggered: { _visible = false; pickerOpen = false; vinylSpin.stop() }
     }
 
-    Timer {
-        id: rotationTimer
-        interval: 16
-        repeat: true
-        running: UIState.mediaState === "playing" && !vinylHeld && _visible && isVinylMode()
-        onTriggered: vinylRotation += 0.4
-    }
-
-    Timer {
-        id: seekDebounce
-        interval: 80
-        onTriggered: {
-            if (!vinylHeld || UIState.mediaLen <= 0) return
-            var seekDelta = totalDrag * (UIState.mediaLen / 800)
-            var newPos    = Math.max(0, Math.min(UIState.mediaLen, dragStartPos + seekDelta))
-            UIState.mediaPos = newPos
-        }
-    }
-
-    Process { id: pauseProc }
-    Process { id: seekAndPlayProc }
     Process { id: seekClickProc }
 
     function loadGifs() {
@@ -179,11 +223,7 @@ PanelWindow {
         }
     }
 
-    Timer {
-        id: gifReloadDelay
-        interval: 250
-        onTriggered: reloadGif()
-    }
+    Timer { id: gifReloadDelay; interval: 250; onTriggered: reloadGif() }
 
     MouseArea {
         anchors.fill: parent
@@ -192,18 +232,36 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: Math.min(parent.width - 40, 460)
-        height: pickerOpen ? 420 : 210
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: showing ? 8 : -440
+
+        property real cardWidth: Math.min(parent.width - 40, 460)
+
+        width:   cardWidth
+        height:  pickerOpen ? 420 : 210
+        x:       (parent.width - cardWidth) / 2
+        y:       showing ? 8 : -card.height - 20
+        opacity: showing ? 1 : 0
+        scale:   showing ? 1 : 0.94
+
+        Behavior on y {
+            NumberAnimation { duration: Animations.enterDuration; easing.type: Easing.OutExpo }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: Animations.enterDuration; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
+        }
+        Behavior on height {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+        }
+        Behavior on color {
+            ColorAnimation { duration: Animations.slow }
+        }
+
         radius: 18
         color: a(Colors.bg, UIState.transparencyEnabled ? 0.92 : 1)
         border.width: 1
         border.color: a(Colors.fg, 0.08)
-
-        Behavior on y      { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
-        Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
-        Behavior on color  { ColorAnimation  { duration: 300 } }
 
         MouseArea { anchors.fill: parent }
 
@@ -245,20 +303,67 @@ PanelWindow {
                 height: 178
 
                 Item {
-                    anchors { top: parent.top; bottom: parent.bottom; left: parent.left; right: mediaSide.left; rightMargin: 14 }
+                    anchors {
+                        top: parent.top; bottom: parent.bottom
+                        left: parent.left; right: mediaSide.left; rightMargin: 14
+                    }
 
-                    Text {
-                        id: titleText
+                    Item {
+                        id: titleMarqueeRoot
+                        property real gap:       40
+                        property real unitWidth: titleMarqueeA.implicitWidth + gap
+                        property bool scrolling: titleMarqueeA.implicitWidth > parent.width
+
                         anchors { top: parent.top; left: parent.left; right: parent.right }
-                        text: UIState.mediaTitle || "Nothing playing"
-                        color: Colors.fg
-                        font { pixelSize: 14; family: "JetBrainsMono Nerd Font"; bold: true }
-                        elide: Text.ElideRight
+                        height: 20
+                        clip: true
+
+                        Row {
+                            id: titleMarqueeTrack
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 0
+
+                            Text {
+                                id: titleMarqueeA
+                                text: UIState.mediaTitle || "Nothing playing"
+                                color: Colors.fg
+                                font { pixelSize: 14; family: "JetBrainsMono Nerd Font"; bold: true }
+                            }
+
+                            Item { width: titleMarqueeRoot.gap; height: 1; visible: titleMarqueeRoot.scrolling }
+
+                            Text {
+                                text: UIState.mediaTitle || "Nothing playing"
+                                color: Colors.fg
+                                font { pixelSize: 14; family: "JetBrainsMono Nerd Font"; bold: true }
+                                visible: titleMarqueeRoot.scrolling
+                            }
+                        }
+
+                        NumberAnimation {
+                            id: titleMarqueeAnim
+                            target: titleMarqueeTrack
+                            property: "x"
+                            from: 0
+                            to: -titleMarqueeRoot.unitWidth
+                            duration: titleMarqueeRoot.unitWidth * 22
+                            loops: Animation.Infinite
+                            running: titleMarqueeRoot.scrolling
+                            easing.type: Easing.Linear
+                        }
+
+                        Connections {
+                            target: UIState
+                            function onMediaTitleChanged() {
+                                titleMarqueeAnim.stop()
+                                titleMarqueeTrack.x = 0
+                                if (titleMarqueeRoot.scrolling) titleMarqueeAnim.start()
+                            }
+                        }
                     }
 
                     Text {
-                        id: artistText
-                        anchors { top: titleText.bottom; topMargin: 3; left: parent.left; right: parent.right }
+                        anchors { top: titleMarqueeRoot.bottom; topMargin: 3; left: parent.left; right: parent.right }
                         text: UIState.mediaArtist || ""
                         color: a(Colors.fg, 0.45)
                         font { pixelSize: 11; family: "JetBrainsMono Nerd Font" }
@@ -280,30 +385,45 @@ PanelWindow {
                         }
 
                         Item {
-                            anchors { left: posText.right; leftMargin: 8; right: lenText.left; rightMargin: 8; verticalCenter: parent.verticalCenter }
-                            height: 4
+                            id: seekTrack
+                            anchors {
+                                left: posText.right; leftMargin: 8
+                                right: lenText.left; rightMargin: 8
+                                verticalCenter: parent.verticalCenter
+                            }
+                            height: seekMa.containsMouse ? 6 : 4
+
+                            Behavior on height {
+                                NumberAnimation { duration: Animations.fast; easing.type: Easing.OutCubic }
+                            }
 
                             Rectangle {
                                 anchors.fill: parent
-                                radius: 2
+                                radius: parent.height / 2
                                 color: a(Colors.fg, 0.08)
                             }
 
                             Rectangle {
                                 width: UIState.mediaLen > 0 ? parent.width * (UIState.mediaPos / UIState.mediaLen) : 0
                                 height: parent.height
-                                radius: 2
+                                radius: parent.height / 2
                                 color: Colors.accent
                             }
 
                             Rectangle {
-                                x: UIState.mediaLen > 0 ? Math.max(0, parent.width * (UIState.mediaPos / UIState.mediaLen) - 5) : -5
+                                x: UIState.mediaLen > 0
+                                    ? Math.max(0, seekTrack.width * (UIState.mediaPos / UIState.mediaLen) - width / 2)
+                                    : -width
                                 anchors.verticalCenter: parent.verticalCenter
-                                width: seekMa.containsMouse ? 12 : 10
-                                height: width; radius: width / 2
-                                color: Colors.fg
+                                width:  seekMa.containsMouse ? 14 : 0
+                                height: width
+                                radius: width / 2
+                                color:  Colors.fg
                                 visible: UIState.hasMedia
-                                Behavior on width { NumberAnimation { duration: 120 } }
+
+                                Behavior on width {
+                                    NumberAnimation { duration: Animations.fast; easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+                                }
                             }
 
                             MouseArea {
@@ -314,10 +434,9 @@ PanelWindow {
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: function(mouse) {
                                     if (UIState.mediaLen > 0) {
-                                        var ratio = Math.max(0, Math.min(1, mouse.x / parent.width))
+                                        var ratio = Math.max(0, Math.min(1, mouse.x / seekTrack.width))
                                         var pos   = Math.floor(ratio * UIState.mediaLen)
-                                        seekClickProc.command = ["mpc", "seek", pos.toString()]
-                                        seekClickProc.running = true
+                                        UIState.seekMedia(pos)
                                         UIState.mediaPos = pos
                                     }
                                 }
@@ -341,20 +460,24 @@ PanelWindow {
                         Rectangle {
                             width: 34; height: 34; radius: 10
                             color: prevMa.containsMouse ? a(Colors.fg, 0.08) : "transparent"
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: prevMa.pressed ? 0.88 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰒮"
                                 color: prevMa.containsMouse ? Colors.fg : a(Colors.fg, 0.5)
                                 font { pixelSize: 16; family: "JetBrainsMono Nerd Font" }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {
                                 id: prevMa
                                 anchors.fill: parent
-                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
                                 onClicked: UIState.doMedia("previous")
                             }
                         }
@@ -362,11 +485,13 @@ PanelWindow {
                         Rectangle {
                             width: 44; height: 44; radius: 22
                             anchors.verticalCenter: parent.verticalCenter
-                            color: playMa.containsMouse ? Colors.accent : a(Colors.accent, 0.9)
-                            scale: playMa.pressed ? 0.92 : 1
+                            color: playMa.containsMouse ? Colors.accent : a(Colors.accent, 0.88)
+                            scale: playMa.pressed ? 0.88 : playMa.containsMouse ? 1.06 : 1
 
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            Behavior on scale { NumberAnimation { duration: 80 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale {
+                                NumberAnimation { duration: Animations.snap; easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
@@ -378,6 +503,7 @@ PanelWindow {
                             MouseArea {
                                 id: playMa
                                 anchors.fill: parent
+                                hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: UIState.doMedia("play-pause")
                             }
@@ -386,20 +512,24 @@ PanelWindow {
                         Rectangle {
                             width: 34; height: 34; radius: 10
                             color: nextMa.containsMouse ? a(Colors.fg, 0.08) : "transparent"
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: nextMa.pressed ? 0.88 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰒭"
                                 color: nextMa.containsMouse ? Colors.fg : a(Colors.fg, 0.5)
                                 font { pixelSize: 16; family: "JetBrainsMono Nerd Font" }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {
                                 id: nextMa
                                 anchors.fill: parent
-                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
                                 onClicked: UIState.doMedia("next")
                             }
                         }
@@ -420,28 +550,44 @@ PanelWindow {
                         asynchronous: true
                         visible: displayMode === 0 && gifReady
                         opacity: gifReady ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                        scale:   gifReady ? 1 : 0.94
+
+                        Behavior on opacity {
+                            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
+                        }
                     }
 
                     Item {
                         anchors.centerIn: parent
-                        width: Math.min(mediaSide.width, mediaSide.height)
-                        height: width
+                        width:   Math.min(mediaSide.width, mediaSide.height)
+                        height:  width
                         visible: isVinylMode()
+                        scale:   isVinylMode() && showing ? 1 : 0.85
+                        opacity: isVinylMode() && showing ? 1 : 0
+
+                        Behavior on scale {
+                            NumberAnimation { duration: Animations.slow; easing.type: Easing.OutBack; easing.overshoot: 1.4 }
+                        }
+                        Behavior on opacity {
+                            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+                        }
 
                         Item {
                             id: vinylDisc
                             anchors.centerIn: parent
-                            width: parent.width
-                            height: parent.width
+                            width:    parent.width
+                            height:   parent.width
                             rotation: vinylRotation
 
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: parent.width
+                                width:  parent.width
                                 height: parent.width
                                 radius: width / 2
-                                color: "#0d0d0d"
+                                color:  "#0d0d0d"
 
                                 layer.enabled: true
                                 layer.effect: DropShadow {
@@ -458,18 +604,18 @@ PanelWindow {
                                 model: 8
                                 Rectangle {
                                     anchors.centerIn: parent
-                                    width: parent.width * (0.97 - index * 0.016)
+                                    width:  parent.width * (0.97 - index * 0.016)
                                     height: width
                                     radius: width / 2
-                                    color: "transparent"
+                                    color:  "transparent"
                                     border.width: index % 2 === 0 ? 1 : 0.5
-                                    border.color: index % 2 === 0 ? Qt.rgba(1, 1, 1, 0.055) : Qt.rgba(1, 1, 1, 0.022)
+                                    border.color: index % 2 === 0 ? Qt.rgba(1,1,1,0.055) : Qt.rgba(1,1,1,0.022)
                                 }
                             }
 
                             Item {
                                 anchors.centerIn: parent
-                                width: parent.width * 0.75
+                                width:  parent.width * 0.75
                                 height: width
 
                                 Image {
@@ -501,18 +647,18 @@ PanelWindow {
                                     radius: width / 2
                                     color: "transparent"
                                     border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.07)
+                                    border.color: Qt.rgba(1,1,1,0.07)
                                 }
                             }
 
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: parent.width * 0.08
+                                width:  parent.width * 0.08
                                 height: width
                                 radius: width / 2
-                                color: "#1e1e1e"
+                                color:  "#1e1e1e"
                                 border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.1)
+                                border.color: Qt.rgba(1,1,1,0.1)
                             }
 
                             Rectangle {
@@ -527,31 +673,11 @@ PanelWindow {
                             id: vinylMa
                             anchors.fill: parent
                             hoverEnabled: true
-                            cursorShape: vinylHeld ? Qt.ClosedHandCursor : Qt.OpenHandCursor
-
-                            onPressed: {
-                                vinylHeld    = true
-                                totalDrag    = 0
-                                lastX        = mouseX
-                                dragStartPos = UIState.mediaPos
-                                UIState.blockMediaPosUpdate = true
-                                pauseProc.command = ["mpc", "pause"]
-                                pauseProc.running = true
-                            }
-
-                            onReleased: resumePlayback()
-                            onCanceled: resumePlayback()
-
-                            onPositionChanged: {
-                                if (!pressed) return
-                                var dx = mouseX - lastX
-                                lastX  = mouseX
-                                if (Math.abs(dx) > 0) {
-                                    totalDrag     += dx
-                                    vinylRotation += dx * 3.5
-                                    if (Math.abs(totalDrag) > 4) seekDebounce.restart()
-                                }
-                            }
+                            cursorShape:       vinylHeld ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                            onPressed:         grabVinyl(mouseX)
+                            onReleased:        releaseVinyl()
+                            onCanceled:        releaseVinyl()
+                            onPositionChanged: scrubVinyl(mouseX)
                         }
                     }
 
@@ -559,14 +685,17 @@ PanelWindow {
                         anchors { top: parent.top; right: parent.right }
                         width: 22; height: 22; radius: 11
                         color: editMa.containsMouse ? a(Colors.accent, 0.2) : a(Colors.fg, 0.06)
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        scale: editMa.pressed ? 0.88 : 1
+
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
+                        Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                         Text {
                             anchors.centerIn: parent
                             text: "󰏫"
                             color: editMa.containsMouse ? Colors.accent : a(Colors.fg, 0.35)
                             font { pixelSize: 10; family: "JetBrainsMono Nerd Font" }
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         MouseArea {
@@ -586,14 +715,22 @@ PanelWindow {
                 anchors { top: mainSection.bottom; topMargin: 6; left: parent.left; right: parent.right }
                 height: 1
                 color: a(Colors.fg, 0.05)
-                visible: pickerOpen
+                opacity: pickerOpen ? 1 : 0
+                Behavior on opacity { NumberAnimation { duration: Animations.fast } }
             }
 
             Item {
                 anchors { top: mainSection.bottom; topMargin: 14; left: parent.left; right: parent.right; bottom: parent.bottom }
                 visible: pickerOpen
                 opacity: pickerOpen ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
+                scale:   pickerOpen ? 1 : 0.97
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+                }
+                Behavior on scale {
+                    NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+                }
 
                 Row {
                     id: tabRow
@@ -603,10 +740,15 @@ PanelWindow {
                     Rectangle {
                         width: gifTabLabel.implicitWidth + 20
                         height: 26; radius: 8
-                        color: pickerTab === 0 ? a(Colors.accent, 0.15) : gifTabMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
+                        color: pickerTab === 0
+                            ? a(Colors.accent, 0.15)
+                            : gifTabMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
                         border.width: pickerTab === 0 ? 1 : 0
                         border.color: a(Colors.accent, 0.3)
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        scale: gifTabMa.pressed ? 0.92 : 1
+
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
+                        Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                         Text {
                             id: gifTabLabel
@@ -614,28 +756,29 @@ PanelWindow {
                             text: "GIF"
                             color: pickerTab === 0 ? Colors.accent : a(Colors.fg, 0.35)
                             font { pixelSize: 9; family: "JetBrainsMono Nerd Font"; bold: true; letterSpacing: 0.8 }
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         MouseArea {
                             id: gifTabMa
                             anchors.fill: parent
                             hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                pickerTab   = 0
-                                displayMode = 0
-                                UIState.setMediaDisplayMode(0)
-                            }
+                            onClicked: { pickerTab = 0; displayMode = 0; UIState.setMediaDisplayMode(0) }
                         }
                     }
 
                     Rectangle {
                         width: vinylTabLabel.implicitWidth + 20
                         height: 26; radius: 8
-                        color: pickerTab === 1 ? a(Colors.accent, 0.15) : vinylTabMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
+                        color: pickerTab === 1
+                            ? a(Colors.accent, 0.15)
+                            : vinylTabMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
                         border.width: pickerTab === 1 ? 1 : 0
                         border.color: a(Colors.accent, 0.3)
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                        scale: vinylTabMa.pressed ? 0.92 : 1
+
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
+                        Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                         Text {
                             id: vinylTabLabel
@@ -643,24 +786,24 @@ PanelWindow {
                             text: "VINYL"
                             color: pickerTab === 1 ? Colors.accent : a(Colors.fg, 0.35)
                             font { pixelSize: 9; family: "JetBrainsMono Nerd Font"; bold: true; letterSpacing: 0.8 }
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         MouseArea {
                             id: vinylTabMa
                             anchors.fill: parent
                             hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                pickerTab   = 1
-                                displayMode = 1
-                                UIState.setMediaDisplayMode(1)
-                            }
+                            onClicked: { pickerTab = 1; displayMode = 1; UIState.setMediaDisplayMode(1) }
                         }
                     }
                 }
 
                 Item {
-                    anchors { top: tabRow.bottom; topMargin: 10; left: parent.left; right: parent.right; bottom: pickerBtnsArea.top; bottomMargin: 8 }
+                    anchors {
+                        top: tabRow.bottom; topMargin: 10
+                        left: parent.left; right: parent.right
+                        bottom: pickerBtnsArea.top; bottomMargin: 8
+                    }
 
                     Rectangle {
                         anchors.fill: parent
@@ -721,33 +864,33 @@ PanelWindow {
 
                         Item {
                             anchors.centerIn: parent
-                            width: Math.min(parent.width, parent.height) - 16
+                            width:  Math.min(parent.width, parent.height) - 16
                             height: width
 
                             Rectangle {
                                 anchors.centerIn: parent
-                                width: parent.width
-                                height: parent.width
-                                radius: width / 2
-                                color: "#0d0d0d"
+                                width:    parent.width
+                                height:   parent.width
+                                radius:   width / 2
+                                color:    "#0d0d0d"
                                 rotation: vinylRotation
 
                                 Repeater {
                                     model: 8
                                     Rectangle {
                                         anchors.centerIn: parent
-                                        width: parent.width * (0.97 - index * 0.016)
+                                        width:  parent.width * (0.97 - index * 0.016)
                                         height: width
                                         radius: width / 2
-                                        color: "transparent"
+                                        color:  "transparent"
                                         border.width: index % 2 === 0 ? 1 : 0.5
-                                        border.color: index % 2 === 0 ? Qt.rgba(1, 1, 1, 0.055) : Qt.rgba(1, 1, 1, 0.022)
+                                        border.color: index % 2 === 0 ? Qt.rgba(1,1,1,0.055) : Qt.rgba(1,1,1,0.022)
                                     }
                                 }
 
                                 Item {
                                     anchors.centerIn: parent
-                                    width: parent.width * 0.75
+                                    width:  parent.width * 0.75
                                     height: width
 
                                     Image {
@@ -779,18 +922,18 @@ PanelWindow {
                                         radius: width / 2
                                         color: "transparent"
                                         border.width: 1
-                                        border.color: Qt.rgba(1, 1, 1, 0.07)
+                                        border.color: Qt.rgba(1,1,1,0.07)
                                     }
                                 }
 
                                 Rectangle {
                                     anchors.centerIn: parent
-                                    width: parent.width * 0.08
+                                    width:  parent.width * 0.08
                                     height: width
                                     radius: width / 2
-                                    color: "#1e1e1e"
+                                    color:  "#1e1e1e"
                                     border.width: 1
-                                    border.color: Qt.rgba(1, 1, 1, 0.1)
+                                    border.color: Qt.rgba(1,1,1,0.1)
                                 }
 
                                 Rectangle {
@@ -808,10 +951,15 @@ PanelWindow {
                             Rectangle {
                                 width: withArtLabel.implicitWidth + 16
                                 height: 24; radius: 8
-                                color: vinylWithArt ? a(Colors.accent, 0.15) : withArtMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
+                                color: vinylWithArt
+                                    ? a(Colors.accent, 0.15)
+                                    : withArtMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
                                 border.width: vinylWithArt ? 1 : 0
                                 border.color: a(Colors.accent, 0.3)
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                scale: withArtMa.pressed ? 0.92 : 1
+
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
+                                Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                                 Text {
                                     id: withArtLabel
@@ -819,27 +967,29 @@ PanelWindow {
                                     text: "With Art"
                                     color: vinylWithArt ? Colors.accent : a(Colors.fg, 0.35)
                                     font { pixelSize: 9; family: "JetBrainsMono Nerd Font" }
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                 }
 
                                 MouseArea {
                                     id: withArtMa
                                     anchors.fill: parent
                                     hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        vinylWithArt = true
-                                        UIState.setMediaVinylWithArt(true)
-                                    }
+                                    onClicked: { vinylWithArt = true; UIState.setMediaVinylWithArt(true) }
                                 }
                             }
 
                             Rectangle {
                                 width: noArtLabel.implicitWidth + 16
                                 height: 24; radius: 8
-                                color: !vinylWithArt ? a(Colors.accent, 0.15) : noArtMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
+                                color: !vinylWithArt
+                                    ? a(Colors.accent, 0.15)
+                                    : noArtMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.fg, 0.03)
                                 border.width: !vinylWithArt ? 1 : 0
                                 border.color: a(Colors.accent, 0.3)
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                scale: noArtMa.pressed ? 0.92 : 1
+
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
+                                Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                                 Text {
                                     id: noArtLabel
@@ -847,17 +997,14 @@ PanelWindow {
                                     text: "No Art"
                                     color: !vinylWithArt ? Colors.accent : a(Colors.fg, 0.35)
                                     font { pixelSize: 9; family: "JetBrainsMono Nerd Font" }
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                 }
 
                                 MouseArea {
                                     id: noArtMa
                                     anchors.fill: parent
                                     hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        vinylWithArt = false
-                                        UIState.setMediaVinylWithArt(false)
-                                    }
+                                    onClicked: { vinylWithArt = false; UIState.setMediaVinylWithArt(false) }
                                 }
                             }
                         }
@@ -878,14 +1025,17 @@ PanelWindow {
                             width: 32; height: 30; radius: 8
                             color: prevGif.containsMouse ? a(Colors.accent, 0.12) : a(Colors.fg, 0.05)
                             opacity: gifFiles.length > 1 ? 1 : 0.3
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: prevGif.pressed ? 0.9 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰅁"
                                 color: prevGif.containsMouse ? Colors.accent : a(Colors.fg, 0.4)
                                 font { pixelSize: 13; family: "JetBrainsMono Nerd Font" }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {
@@ -901,14 +1051,17 @@ PanelWindow {
                             width: 32; height: 30; radius: 8
                             color: nextGif.containsMouse ? a(Colors.accent, 0.12) : a(Colors.fg, 0.05)
                             opacity: gifFiles.length > 1 ? 1 : 0.3
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: nextGif.pressed ? 0.9 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: "󰅂"
                                 color: nextGif.containsMouse ? Colors.accent : a(Colors.fg, 0.4)
                                 font { pixelSize: 13; family: "JetBrainsMono Nerd Font" }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {
@@ -927,18 +1080,25 @@ PanelWindow {
                             width: applyLabel.implicitWidth + 18
                             height: 30; radius: 8
                             property bool canApply: previewIndex !== UIState.gifIndex && !applyingGif && gifFiles.length > 0
-                            color: canApply ? (applyMa.containsMouse ? a(Colors.accent, 0.2) : a(Colors.accent, 0.1)) : a(Colors.fg, 0.03)
+                            color: canApply
+                                ? (applyMa.containsMouse ? a(Colors.accent, 0.2) : a(Colors.accent, 0.1))
+                                : a(Colors.fg, 0.03)
                             border.width: canApply ? 1 : 0
                             border.color: a(Colors.accent, applyMa.containsMouse ? 0.4 : 0.2)
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: applyMa.pressed ? 0.92 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 id: applyLabel
                                 anchors.centerIn: parent
                                 text: applyingGif ? "..." : previewIndex === UIState.gifIndex ? "󰄬 Current" : "󰸞 Apply"
-                                color: applyRect.canApply ? (applyMa.containsMouse ? Colors.accent : a(Colors.accent, 0.7)) : a(Colors.fg, 0.2)
+                                color: applyRect.canApply
+                                    ? (applyMa.containsMouse ? Colors.accent : a(Colors.accent, 0.7))
+                                    : a(Colors.fg, 0.2)
                                 font { pixelSize: 10; family: "JetBrainsMono Nerd Font"; bold: true }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {
@@ -962,7 +1122,10 @@ PanelWindow {
                             color: applyVinylMa.containsMouse ? a(Colors.accent, 0.2) : a(Colors.accent, 0.1)
                             border.width: 1
                             border.color: a(Colors.accent, applyVinylMa.containsMouse ? 0.4 : 0.2)
-                            Behavior on color { ColorAnimation { duration: 120 } }
+                            scale: applyVinylMa.pressed ? 0.92 : 1
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
+                            Behavior on scale { NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad } }
 
                             Text {
                                 id: applyVinylLabel
@@ -970,7 +1133,7 @@ PanelWindow {
                                 text: "󰸞 Apply"
                                 color: applyVinylMa.containsMouse ? Colors.accent : a(Colors.accent, 0.7)
                                 font { pixelSize: 10; family: "JetBrainsMono Nerd Font"; bold: true }
-                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: Animations.fast } }
                             }
 
                             MouseArea {

@@ -51,7 +51,7 @@ PanelWindow {
         spacing: 10
 
         move: Transition {
-            NumberAnimation { properties: "y"; duration: 300; easing.type: Easing.OutExpo }
+            NumberAnimation { properties: "y"; duration: Animations.medium; easing.type: Easing.OutExpo }
         }
 
         Repeater {
@@ -59,16 +59,16 @@ PanelWindow {
 
             Item {
                 id: wrapper
-                width: toastCol.width
-                height: card.height + 4
-                opacity: 0
+                width:           toastCol.width
+                height:          card.height + 4
+                opacity:         0
                 transformOrigin: Item.TopRight
-                property bool dying: false
-                property real cardX: 0
-                property real cardRotation: 0
-                property real cardScale: 0.8
-                property real progress: 1.0
-                property bool hovered: cardMa.containsMouse || dismissMa.containsMouse
+
+                property bool dying:        false
+                property real cardX:        0
+                property real cardScale:    0.86
+                property real progress:     1.0
+                property bool hovered:      cardMa.containsMouse || dismissMa.containsMouse
 
                 onHoveredChanged: {
                     if (dying) return
@@ -85,10 +85,21 @@ PanelWindow {
 
                 ParallelAnimation {
                     id: enterAnim
-                    NumberAnimation { target: wrapper; property: "opacity"; to: 1; duration: 300; easing.type: Easing.OutCubic }
-                    NumberAnimation { target: wrapper; property: "cardScale"; to: 1; duration: 500; easing.type: Easing.OutBack; easing.overshoot: 2 }
-                    NumberAnimation { target: wrapper; property: "cardX"; from: 30; to: 0; duration: 400; easing.type: Easing.OutExpo }
-                    NumberAnimation { target: wrapper; property: "cardRotation"; from: 3; to: 0; duration: 500; easing.type: Easing.OutBack; easing.overshoot: 3 }
+                    NumberAnimation {
+                        target: wrapper; property: "opacity"
+                        from: 0; to: 1
+                        duration: Animations.medium; easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        target: wrapper; property: "cardScale"
+                        from: 0.86; to: 1
+                        duration: Animations.slow; easing.type: Easing.OutBack; easing.overshoot: Animations.springPower
+                    }
+                    NumberAnimation {
+                        target: wrapper; property: "cardX"
+                        from: 340; to: 0
+                        duration: Animations.enterDuration; easing.type: Easing.OutExpo
+                    }
                 }
 
                 function dismiss() {
@@ -101,43 +112,51 @@ PanelWindow {
 
                 ParallelAnimation {
                     id: exitAnim
-                    NumberAnimation { target: wrapper; property: "opacity"; to: 0; duration: 180; easing.type: Easing.InCubic }
-                    NumberAnimation { target: wrapper; property: "cardScale"; to: 0.9; duration: 180; easing.type: Easing.InCubic }
-                    NumberAnimation { target: wrapper; property: "cardX"; to: 60; duration: 200; easing.type: Easing.InQuad }
+                    NumberAnimation {
+                        target: wrapper; property: "opacity"
+                        to: 0; duration: Animations.exitDuration; easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        target: wrapper; property: "cardScale"
+                        to: 0.94; duration: Animations.exitDuration; easing.type: Easing.OutCubic
+                    }
+                    NumberAnimation {
+                        target: wrapper; property: "cardX"
+                        to: 340; duration: Animations.exitDuration + 40; easing.type: Easing.InExpo
+                    }
                     onFinished: popup.removeToast(model.nid)
                 }
 
                 Timer {
                     id: autoTimer
                     interval: model.duration
-                    running: true
+                    running:  true
                     onTriggered: wrapper.dismiss()
                 }
 
                 Timer {
                     id: progressTimer
                     interval: 50
-                    running: true
-                    repeat: true
+                    running:  true
+                    repeat:   true
                     onTriggered: progress = Math.max(0, progress - (50 / model.duration))
                 }
 
                 Rectangle {
                     id: card
-                    x: wrapper.cardX
-                    rotation: wrapper.cardRotation
-                    scale: wrapper.cardScale
+                    x:               wrapper.cardX
+                    scale:           wrapper.cardScale
                     transformOrigin: Item.TopRight
-                    width: parent.width
+                    width:  parent.width
                     height: content.height + 46
                     radius: 14
-                    color: a(Colors.bg, UIState.transparencyEnabled ? (wrapper.hovered ? 0.95 : 0.88) : 1)
+                    color:  a(Colors.bg, UIState.transparencyEnabled ? (wrapper.hovered ? 0.96 : 0.88) : 1)
                     border.width: wrapper.hovered ? 1.5 : 1
-                    border.color: a(Colors.accent, wrapper.hovered ? 0.45 : 0.12)
+                    border.color: a(Colors.accent, wrapper.hovered ? 0.4 : 0.1)
 
-                    Behavior on color { ColorAnimation { duration: 200 } }
-                    Behavior on border.color { ColorAnimation { duration: 200 } }
-                    Behavior on border.width { NumberAnimation { duration: 150 } }
+                    Behavior on color        { ColorAnimation  { duration: Animations.fast } }
+                    Behavior on border.color { ColorAnimation  { duration: Animations.fast } }
+                    Behavior on border.width { NumberAnimation { duration: Animations.fast } }
 
                     Column {
                         id: content
@@ -155,7 +174,7 @@ PanelWindow {
                             }
 
                             Text {
-                                text: model.app.toUpperCase()
+                                text:  model.app.toUpperCase()
                                 color: a(Colors.accent, 0.6)
                                 font { pixelSize: 8; family: "JetBrainsMono Nerd Font"; bold: true; letterSpacing: 1.2 }
                                 anchors.verticalCenter: parent.verticalCenter
@@ -163,7 +182,7 @@ PanelWindow {
                         }
 
                         Text {
-                            text: model.title
+                            text:  model.title
                             color: Colors.fg
                             font { pixelSize: 11; family: "JetBrainsMono Nerd Font"; bold: true }
                             width: parent.width
@@ -174,8 +193,8 @@ PanelWindow {
 
                         Text {
                             visible: model.body !== ""
-                            text: model.body
-                            color: a(Colors.fg, 0.45)
+                            text:    model.body
+                            color:   a(Colors.fg, 0.45)
                             font { pixelSize: 10; family: "JetBrainsMono Nerd Font" }
                             width: parent.width
                             wrapMode: Text.WordWrap
@@ -195,13 +214,13 @@ PanelWindow {
 
                     Text {
                         anchors { right: parent.right; top: parent.top; rightMargin: 12; topMargin: 12 }
-                        text: "󰅖"
+                        text:  "󰅖"
                         color: dismissMa.containsMouse ? Colors.red : a(Colors.fg, 0.25)
                         font { pixelSize: 11; family: "JetBrainsMono Nerd Font" }
                         opacity: wrapper.hovered ? 1 : 0
 
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on opacity { NumberAnimation { duration: Animations.fast } }
+                        Behavior on color   { ColorAnimation  { duration: Animations.fast } }
 
                         MouseArea {
                             id: dismissMa
@@ -218,15 +237,14 @@ PanelWindow {
                         anchors { leftMargin: 14; rightMargin: 14; bottomMargin: 10 }
                         height: 2
                         radius: 1
-                        color: a(Colors.fg, 0.06)
+                        color:  a(Colors.fg, 0.06)
 
                         Rectangle {
-                            width: parent.width * wrapper.progress
+                            width:  parent.width * wrapper.progress
                             height: parent.height
                             radius: 1
-                            color: a(Colors.accent, wrapper.hovered ? 0.7 : 0.5)
-
-                            Behavior on color { ColorAnimation { duration: 200 } }
+                            color:  a(Colors.accent, wrapper.hovered ? 0.65 : 0.45)
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
                     }
                 }

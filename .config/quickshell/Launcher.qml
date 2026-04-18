@@ -100,10 +100,10 @@ PanelWindow {
 
     function moveSelection(delta) {
         if (query === "") {
-            if (delta === 1 && selected < topApps.length - 1) selected++
-            else if (delta === -1 && selected > 0) selected--
-            else if (delta === 4 && selected + 4 < topApps.length) selected += 4
-            else if (delta === -4 && selected - 4 >= 0) selected -= 4
+            if (delta === 1  && selected < topApps.length - 1)  selected++
+            else if (delta === -1 && selected > 0)               selected--
+            else if (delta === 4  && selected + 4 < topApps.length) selected += 4
+            else if (delta === -4 && selected - 4 >= 0)          selected -= 4
         } else {
             var newSel = selected + delta
             if (newSel < 0) newSel = 0
@@ -138,7 +138,7 @@ PanelWindow {
                 var p = line.split("\t")
                 if (p.length >= 3) {
                     _appsBuild.push({
-                        id: p[0],
+                        id:   p[0],
                         name: p[1],
                         exec: p[2],
                         icon: p[3] || "",
@@ -148,7 +148,7 @@ PanelWindow {
             }
         }
         onExited: {
-            var seen = {}
+            var seen   = {}
             var result = []
             for (var i = 0; i < _appsBuild.length; i++) {
                 if (!seen[_appsBuild[i].name]) {
@@ -156,7 +156,7 @@ PanelWindow {
                     result.push(_appsBuild[i])
                 }
             }
-            apps = result
+            apps      = result
             _appsBuild = []
             filterApps()
         }
@@ -171,19 +171,31 @@ PanelWindow {
 
     Rectangle {
         id: card
-        width: ready ? 520 : 200
-        height: ready ? (query === "" ? 380 : 480) : 56
+        width:  ready ? 520 : 160
+        height: ready ? (query === "" ? 380 : 480) : 52
         anchors.centerIn: parent
         radius: 20
-        color: a(Colors.bg, UIState.transparencyEnabled ? 0.82 : 1)
+        color:  a(Colors.bg, UIState.transparencyEnabled ? 0.82 : 1)
         border.width: 1
         border.color: a(Colors.fg, 0.1)
-        opacity: ready ? 1 : 0.8
+        opacity: ready ? 1 : 0
+        scale:   ready ? 1 : Animations.enterScale
 
-        Behavior on width { NumberAnimation { duration: 450; easing.type: Easing.OutExpo } }
-        Behavior on height { NumberAnimation { duration: 350; easing.type: Easing.OutExpo } }
-        Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
-        Behavior on color { ColorAnimation { duration: 300 } }
+        Behavior on width {
+            NumberAnimation { duration: Animations.slow; easing.type: Easing.OutExpo }
+        }
+        Behavior on height {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: Animations.slow; easing.type: Easing.OutBack; easing.overshoot: Animations.springPower }
+        }
+        Behavior on color {
+            ColorAnimation { duration: Animations.slow }
+        }
 
         Column {
             anchors.fill: parent
@@ -192,17 +204,21 @@ PanelWindow {
             opacity: ready ? 1 : 0
             visible: opacity > 0
 
-            Behavior on opacity { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+            Behavior on opacity {
+                NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+            }
 
             Rectangle {
-                width: parent.width
+                width:  parent.width
                 height: 48
                 radius: 14
-                color: a(Colors.surface, 0.7)
+                color:  a(Colors.surface, 0.7)
                 border.width: searchInput.activeFocus ? 2 : 1
-                border.color: searchInput.activeFocus ? a(Colors.accent, 0.6) : a(Colors.fg, 0.06)
+                border.color: searchInput.activeFocus ? a(Colors.accent, 0.55) : a(Colors.fg, 0.06)
 
-                Behavior on border.color { ColorAnimation { duration: 200 } }
+                Behavior on border.color {
+                    ColorAnimation { duration: Animations.fast }
+                }
 
                 Row {
                     anchors.fill: parent
@@ -212,10 +228,10 @@ PanelWindow {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: ""
+                        text:  ""
                         color: searchInput.activeFocus ? Colors.accent : a(Colors.fg, 0.3)
                         font { pixelSize: 15; family: "JetBrainsMono Nerd Font" }
-                        Behavior on color { ColorAnimation { duration: 200 } }
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
                     }
 
                     TextInput {
@@ -230,9 +246,9 @@ PanelWindow {
                         Text {
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            text: "Search apps..."
-                            color: a(Colors.fg, 0.25)
-                            font: parent.font
+                            text:    "Search apps..."
+                            color:   a(Colors.fg, 0.25)
+                            font:    parent.font
                             visible: !parent.text && !parent.activeFocus
                         }
 
@@ -270,12 +286,11 @@ PanelWindow {
 
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "󰅖"
-                        color: clearMa.containsMouse ? Colors.fg : a(Colors.fg, 0.3)
+                        text:    "󰅖"
+                        color:   clearMa.containsMouse ? Colors.fg : a(Colors.fg, 0.3)
                         font { pixelSize: 12; family: "JetBrainsMono Nerd Font" }
                         visible: searchInput.text.length > 0
-
-                        Behavior on color { ColorAnimation { duration: 150 } }
+                        Behavior on color { ColorAnimation { duration: Animations.fast } }
 
                         MouseArea {
                             id: clearMa
@@ -290,7 +305,7 @@ PanelWindow {
             }
 
             Item {
-                width: parent.width
+                width:  parent.width
                 height: parent.height - 48 - 16
 
                 Grid {
@@ -305,29 +320,40 @@ PanelWindow {
 
                         Rectangle {
                             id: gridItem
-                            width: (topGrid.width - 30) / 4
+                            required property int index
+                            required property var modelData
+
+                            width:  (topGrid.width - 30) / 4
                             height: width + 16
                             radius: 14
-                            color: index === selected ? a(Colors.accent, 0.15) : gridMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.surface, 0.5)
+                            color:  index === selected
+                                ? a(Colors.accent, 0.15)
+                                : gridMa.containsMouse ? a(Colors.fg, 0.06) : a(Colors.surface, 0.5)
                             border.width: index === selected ? 1.5 : 0
                             border.color: a(Colors.accent, 0.5)
+                            scale: gridMa.pressed ? 0.9 : gridMa.containsMouse ? 1.04 : 1
 
-                            Behavior on color { ColorAnimation { duration: 100 } }
+                            Behavior on color {
+                                ColorAnimation { duration: Animations.fast }
+                            }
+                            Behavior on scale {
+                                NumberAnimation { duration: Animations.snap; easing.type: Easing.OutBack; easing.overshoot: 1.6 }
+                            }
 
                             Column {
                                 anchors.centerIn: parent
                                 spacing: 8
 
                                 Rectangle {
-                                    width: 40
+                                    width:  40
                                     height: 40
                                     radius: 10
-                                    color: a(Colors.fg, 0.06)
+                                    color:  a(Colors.fg, 0.06)
                                     anchors.horizontalCenter: parent.horizontalCenter
 
                                     Image {
                                         anchors.centerIn: parent
-                                        width: 26
+                                        width:  26
                                         height: 26
                                         source: {
                                             var icon = modelData.icon
@@ -342,15 +368,14 @@ PanelWindow {
                                 }
 
                                 Text {
-                                    text: modelData.name
+                                    text:  modelData.name
                                     color: index === selected ? Colors.accent : Colors.fg
                                     font { pixelSize: 9; family: "JetBrainsMono Nerd Font"; bold: index === selected }
                                     width: gridItem.width - 12
                                     horizontalAlignment: Text.AlignHCenter
                                     elide: Text.ElideRight
                                     anchors.horizontalCenter: parent.horizontalCenter
-
-                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                 }
                             }
 
@@ -374,23 +399,48 @@ PanelWindow {
                     model: filtered
                     visible: query !== ""
                     boundsBehavior: Flickable.StopAtBounds
-                    highlightMoveDuration: 80
+                    highlightMoveDuration: Animations.snap
+
+                    add: Transition {
+                        ParallelAnimation {
+                            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Animations.medium; easing.type: Easing.OutCubic }
+                            NumberAnimation { property: "x"; from: 16; to: 0; duration: Animations.medium; easing.type: Easing.OutExpo }
+                        }
+                    }
+
+                    displaced: Transition {
+                        NumberAnimation { property: "y"; duration: Animations.fast; easing.type: Easing.OutExpo }
+                    }
 
                     delegate: Rectangle {
-                        width: appList.width
+                        id: listItem
+                        required property int index
+                        required property var modelData
+
+                        width:  appList.width
                         height: 52
                         radius: 12
-                        color: index === selected ? a(Colors.accent, 0.12) : itemMa.containsMouse ? a(Colors.fg, 0.05) : "transparent"
+                        color:  index === selected
+                            ? a(Colors.accent, 0.12)
+                            : itemMa.containsMouse ? a(Colors.fg, 0.05) : "transparent"
+                        scale: itemMa.pressed ? 0.97 : 1
 
-                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on color {
+                            ColorAnimation { duration: Animations.fast }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: Animations.snap; easing.type: Easing.OutQuad }
+                        }
 
                         Rectangle {
                             visible: index === selected
-                            width: 3
-                            height: 24
-                            radius: 1.5
-                            color: Colors.accent
+                            width:   3
+                            height:  24
+                            radius:  1.5
+                            color:   Colors.accent
                             anchors { left: parent.left; leftMargin: 6; verticalCenter: parent.verticalCenter }
+
+                            Behavior on color { ColorAnimation { duration: Animations.fast } }
                         }
 
                         Row {
@@ -400,15 +450,15 @@ PanelWindow {
                             spacing: 14
 
                             Rectangle {
-                                width: 36
+                                width:  36
                                 height: 36
                                 radius: 10
-                                color: a(Colors.fg, 0.05)
+                                color:  a(Colors.fg, 0.05)
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
                                     anchors.centerIn: parent
-                                    width: 24
+                                    width:  24
                                     height: 24
                                     source: {
                                         var icon = modelData.icon
@@ -428,31 +478,34 @@ PanelWindow {
                                 width: parent.width - 90
 
                                 Text {
-                                    text: modelData.name
+                                    text:  modelData.name
                                     color: index === selected ? Colors.accent : Colors.fg
                                     font { pixelSize: 12; family: "JetBrainsMono Nerd Font"; bold: index === selected }
                                     width: parent.width
                                     elide: Text.ElideRight
-
-                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    Behavior on color { ColorAnimation { duration: Animations.fast } }
                                 }
 
                                 Text {
-                                    text: modelData.desc || ""
-                                    color: a(Colors.fg, 0.3)
+                                    text:    modelData.desc || ""
+                                    color:   a(Colors.fg, 0.3)
                                     font { pixelSize: 9; family: "JetBrainsMono Nerd Font" }
-                                    width: parent.width
-                                    elide: Text.ElideRight
+                                    width:   parent.width
+                                    elide:   Text.ElideRight
                                     visible: text !== ""
                                 }
                             }
 
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
-                                text: "↵"
-                                color: Colors.accent
+                                text:    "↵"
+                                color:   Colors.accent
                                 font { pixelSize: 11; family: "JetBrainsMono Nerd Font"; bold: true }
                                 visible: index === selected
+                                opacity: index === selected ? 1 : 0
+                                Behavior on opacity {
+                                    NumberAnimation { duration: Animations.fast; easing.type: Easing.OutCubic }
+                                }
                             }
                         }
 
@@ -469,10 +522,14 @@ PanelWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: query !== "" && filtered.length === 0 ? "No results" : apps.length === 0 ? "Loading..." : ""
-                    color: a(Colors.fg, 0.2)
+                    text:    query !== "" && filtered.length === 0 ? "No results" : apps.length === 0 ? "Loading..." : ""
+                    color:   a(Colors.fg, 0.2)
                     font { pixelSize: 13; family: "JetBrainsMono Nerd Font" }
                     visible: text !== ""
+                    opacity: visible ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: Animations.fast }
+                    }
                 }
             }
         }

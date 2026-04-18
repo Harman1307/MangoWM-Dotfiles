@@ -42,13 +42,13 @@ Singleton {
     property int mediaDisplayMode: 0
     property bool mediaVinylWithArt: true
 
-    property string _settingsPath:      Quickshell.env("HOME") + "/.config/quickshell/state/settings.json"
-    property string _appUsagePath:      Quickshell.env("HOME") + "/.config/quickshell/state/app_usage.json"
-    property string _kittyColorsPath:   Quickshell.env("HOME") + "/.cache/qs/kitty-colors.conf"
-    property string _mangoConfigPath:   Quickshell.env("HOME") + "/.config/mango/config.conf"
-    property string _gifPath:           Quickshell.env("HOME") + "/.config/quickshell/assets/gifs"
-    property string _hyprlockConfigPath:Quickshell.env("HOME") + "/.config/hypr/hyprlock.conf"
-    property string _blurredWallPath:   Quickshell.env("HOME") + "/.cache/qs/lockscreen-bg.jpg"
+    property string _settingsPath:       Quickshell.env("HOME") + "/.config/quickshell/state/settings.json"
+    property string _appUsagePath:       Quickshell.env("HOME") + "/.config/quickshell/state/app_usage.json"
+    property string _kittyColorsPath:    Quickshell.env("HOME") + "/.cache/qs/kitty-colors.conf"
+    property string _mangoConfigPath:    Quickshell.env("HOME") + "/.config/mango/config.conf"
+    property string _gifPath:            Quickshell.env("HOME") + "/.config/quickshell/assets/gifs"
+    property string _hyprlockConfigPath: Quickshell.env("HOME") + "/.config/hypr/hyprlock.conf"
+    property string _blurredWallPath:    Quickshell.env("HOME") + "/.cache/qs/lockscreen-bg.jpg"
 
     property int _pendingVolume: -1
 
@@ -183,7 +183,11 @@ Singleton {
 
     function seekMedia(pos) {
         if (!currentPlayer || mediaLen <= 0) return
-        mediaSeekProc.command = ["playerctl", "-p", currentPlayer, "position", pos.toString()]
+        if (currentPlayer === "mpd" || currentPlayer.indexOf("mpd") !== -1) {
+            mediaSeekProc.command = ["mpc", "seek", pos.toString()]
+        } else {
+            mediaSeekProc.command = ["playerctl", "-p", currentPlayer, "position", pos.toString()]
+        }
         mediaSeekProc.running = true
     }
 
@@ -273,7 +277,6 @@ Singleton {
 
                     var x = mediaTitle
                     if (mediaArtist) x = mediaArtist + " - " + mediaTitle
-                    if (x.length > 40) x = x.substring(0, 37) + "..."
                     mediaDisplay = x
                 }
             }
