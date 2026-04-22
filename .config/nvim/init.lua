@@ -229,12 +229,12 @@ local function apply()
     hl("SignColumn",    { fg = p.dim })
     hl("FoldColumn",    { fg = p.dim })
     hl("EndOfBuffer",   { fg = p.surf4 })
-    hl("LineNr",        { fg = p.dim })
-    hl("LineNrAbove",   { fg = mix(p.dim, p.bg, 0.45) })
-    hl("LineNrBelow",   { fg = mix(p.dim, p.bg, 0.45) })
-    hl("CursorLine",    { bg = p.surf2 })
-    hl("CursorLineNr",  { fg = p.yellow, bg = p.surf2, bold = true })
-    hl("CursorColumn",  { bg = p.surf2 })
+    hl("LineNr",        { fg = mix(p.dim, p.bg, 0.35) })
+    hl("LineNrAbove",   { fg = mix(p.dim, p.bg, 0.55) })
+    hl("LineNrBelow",   { fg = mix(p.dim, p.bg, 0.55) })
+    hl("CursorLine",    { bg = "NONE" })
+    hl("CursorLineNr",  { fg = p.accent, bg = "NONE", bold = true })
+    hl("CursorColumn",  { bg = "NONE" })
     hl("ColorColumn",   { bg = p.surf2 })
     hl("Comment",       { fg = p.dim,    italic = true })
     hl("SpecialComment",{ fg = p.dim,    italic = true })
@@ -550,7 +550,7 @@ local function apply()
     hl("GitSignsCurrentLineBlame", { fg = p.dim, italic = true })
 
     hl("IblIndent",     { fg = p.surf3 })
-    hl("IblScope",      { fg = p.surf4 })
+    hl("IblScope",      { fg = mix(p.accent, p.surf2, 0.72) })
     hl("IblWhitespace", { fg = p.surf3 })
 
     local lualine_ok, lualine = pcall(require, "lualine")
@@ -585,6 +585,14 @@ vim.api.nvim_create_autocmd({ "FileType", "BufEnter" }, {
 })
 
 require("lazy").setup({
+
+    {
+        "windwp/nvim-autopairs",
+        event = "InsertEnter",
+        config = function()
+            require("nvim-autopairs").setup({})
+        end,
+    },
 
     {
         "nvim-neo-tree/neo-tree.nvim",
