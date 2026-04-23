@@ -150,7 +150,7 @@ PanelWindow {
     }
 
     function reloadGif() {
-        gifReady        = false
+        gifReady         = false
         gifImage.playing = false
         gifImage.source  = ""
         gifClearDelay.restart()
@@ -160,23 +160,23 @@ PanelWindow {
         id: gifClearDelay
         interval: 150
         onTriggered: {
-            applyingGif      = false
-            gifImage.source  = "file://" + UIState._gifPath + "/current.gif"
+            applyingGif     = false
+            gifImage.source = "file://" + UIState._gifPath + "/current.gif"
         }
     }
 
     Timer {
         id: closeDelay
-        interval: 300
+        interval: Animations.enterDuration + 60
         onTriggered: { _visible = false; pickerOpen = false; vinylSpin.stop() }
     }
 
     Process { id: seekClickProc }
 
     function loadGifs() {
-        gifFiles     = []
-        gifsLoaded   = false
-        previewIndex = 0
+        gifFiles            = []
+        gifsLoaded          = false
+        previewIndex        = 0
         gifListProc.running = true
     }
 
@@ -231,15 +231,31 @@ PanelWindow {
         id: card
 
         property real cardWidth: Math.min(parent.width - 40, 460)
+        property real cardHeight: pickerOpen ? 420 : 210
 
-        width:  cardWidth
-        height: pickerOpen ? 420 : 210
-        x:      (parent.width - cardWidth) / 2
-        y:      showing ? 8 : -(height + 20)
+        width:   cardWidth
+        height:  cardHeight
+        x:       (parent.width - cardWidth) / 2
+        y:       showing ? 8 : -300
+        opacity: showing ? 1 : 0
+        scale:   showing ? 1 : 0.97
+        transformOrigin: Item.Top
 
-        Behavior on y      { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
-        Behavior on height { NumberAnimation { duration: 280; easing.type: Easing.OutCubic } }
-        Behavior on color  { ColorAnimation  { duration: 300 } }
+        Behavior on y {
+            NumberAnimation { duration: Animations.enterDuration; easing.type: Easing.OutExpo }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutCubic }
+        }
+        Behavior on scale {
+            NumberAnimation { duration: Animations.enterDuration; easing.type: Easing.OutCubic }
+        }
+        Behavior on height {
+            NumberAnimation { duration: Animations.medium; easing.type: Easing.OutExpo }
+        }
+        Behavior on color {
+            ColorAnimation { duration: Animations.slow }
+        }
 
         radius: 18
         color: a(Colors.bg, UIState.transparencyEnabled ? 0.92 : 1)
@@ -494,7 +510,6 @@ PanelWindow {
                     id: mediaSide
                     anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
                     width: 158
-                    clip: true
 
                     AnimatedImage {
                         id: gifImage
@@ -524,7 +539,7 @@ PanelWindow {
 
                     Item {
                         anchors.centerIn: parent
-                        width: Math.min(mediaSide.width, mediaSide.height)
+                        width: Math.min(mediaSide.width, mediaSide.height) - 8
                         height: width
                         visible: isVinylMode()
 
@@ -541,16 +556,6 @@ PanelWindow {
                                 height: parent.width
                                 radius: width / 2
                                 color: "#0d0d0d"
-
-                                layer.enabled: true
-                                layer.effect: DropShadow {
-                                    transparentBorder: true
-                                    horizontalOffset: 0
-                                    verticalOffset: 4
-                                    radius: 16
-                                    samples: 33
-                                    color: "#bb000000"
-                                }
                             }
 
                             Repeater {
