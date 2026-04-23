@@ -511,10 +511,12 @@ Singleton {
     function updateMangoOpacity() {
         var unfocused = transparencyEnabled ? "0.85" : "1.0"
         mangoOpacityProc.command = ["bash", "-c",
+            "mmsg -d setoption,focused_opacity,1.0 2>/dev/null; " +
+            "mmsg -d setoption,unfocused_opacity," + unfocused + " 2>/dev/null; " +
             "sed -i " +
             "'s/^focused_opacity=.*/focused_opacity=1.0/; " +
             "s/^unfocused_opacity=.*/unfocused_opacity=" + unfocused + "/' " +
-            _mangoConfigPath + " && mmsg -r 2>/dev/null"]
+            _mangoConfigPath]
         mangoOpacityProc.running = true
     }
 

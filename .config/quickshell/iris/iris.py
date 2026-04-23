@@ -1,5 +1,7 @@
 import sys
 import json
+import os
+import hashlib
 import math
 import argparse
 import subprocess
@@ -15,20 +17,61 @@ def parse_args():
     return p.parse_args()
 
 
-def extract_colors(wallpaper_path):
-    resolved = subprocess.run(
+def get_cache_key(path, dark, glass):
+    try:
+        stat = os.stat(path)
+        raw  = f"{path}{stat.st_mtime}{stat.st_size}_d{dark}_g{glass}"
+    except:
+        raw = f"{path}_d{dark}_g{glass}"
+    return hashlib.md5(raw.encode()).hexdigest()[:14]
+
+
+def check_cache(cache_key):
+    cache_file = os.path.expanduser(f"~/.cache/wallpaper-colors/{cache_key}.json")
+    if os.path.exists(cache_file):
+        try:
+            with open(cache_file) as f:
+                return f.read().strip()
+        except:
+            return None
+    return None
+
+
+def write_cache(cache_key, result):
+    cache_dir = os.path.expanduser("~/.cache/wallpaper-colors")
+    os.makedirs(cache_dir, exist_ok=True)
+    try:
+        with open(f"{cache_dir}/{cache_key}.json", "w") as f:
+            f.write(result)
+    except:
+        pass
+
+
+def resolve_path(wallpaper_path):
+    result = subprocess.run(
         ["readlink", "-f", wallpaper_path],
         capture_output=True, text=True
     ).stdout.strip()
+    return result if result else wallpaper_path
 
-    if not resolved:
-        resolved = wallpaper_path
+
+def find_thumb(resolved):
+    cache_path = os.path.expanduser("~/.cache/wallpaper-thumbs")
+    name       = os.path.basename(resolved)
+    thumb      = os.path.join(cache_path, name + ".thumb.jpg")
+    return thumb if os.path.exists(thumb) else None
+
+
+def extract_colors(wallpaper_path):
+    resolved = resolve_path(wallpaper_path)
+    thumb    = find_thumb(resolved)
+    source   = thumb if thumb else resolved + "[0]"
 
     result = subprocess.run([
         "magick",
-        resolved + "[0]",
+        source,
         "-resize", "200x200!",
-        "-colors", "16",
+        "-colors", "8",
         "-depth", "8",
         "-format", "%c",
         "histogram:info:"
@@ -185,12 +228,9 @@ def pick_accent(clusters, bg_hex, dark):
     for c in clusters:
         if c["s"] < 0.15:
             continue
-
         if contrast_ratio(c["hex"], bg_hex) < 1.5:
             continue
-
         vibrancy = c["s"] * (1 - abs(2 * c["l"] - 1))
-
         if vibrancy > best_score:
             best_score = vibrancy
             best       = c
@@ -360,11 +400,20 @@ def main():
     args     = parse_args()
     dark     = args.dark  == 1
     glass    = args.glass == 1
+
+    resolved  = resolve_path(args.wallpaper)
+    cache_key = get_cache_key(resolved, args.dark, args.glass)
+    cached    = check_cache(cache_key)
+
+    if cached:
+        print(cached)
+        return
+
     raw      = extract_colors(args.wallpaper)
     clusters = parse_histogram(raw)
 
     if not clusters:
-        print(json.dumps({
+        result = json.dumps({
             "bg":      "#11111b",
             "surface": "#1e1e2e",
             "fg":      "#cdd6f4",
@@ -375,7 +424,8 @@ def main():
             "yellow":  "#f9e2af",
             "mode":    "fallback",
             "tone_l":  0.1
-        }))
+        })
+        print(result)
         return
 
     tone_l = weighted_avg_lightness(clusters)
@@ -407,7 +457,9 @@ def main():
         mode    = "vibrant" if vibrant_count >= 2 else "muted"
         palette = build_palette(clusters, dark, glass, tone_l, mode)
 
-    print(json.dumps(palette))
+    result = json.dumps(palette)
+    write_cache(cache_key, result)
+    print(result)
 
 
 main()

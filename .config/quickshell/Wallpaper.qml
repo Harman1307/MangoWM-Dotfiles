@@ -98,7 +98,7 @@ PanelWindow {
             if (keys.length === 0) return
             for (var i = 0; i < keys.length; i++)
                 wallColors[keys[i]] = _pendingColors[keys[i]]
-            wallColors    = Object.assign({}, wallColors)
+            wallColors     = Object.assign({}, wallColors)
             _pendingColors = {}
         }
     }
@@ -127,14 +127,14 @@ PanelWindow {
         if (!colorString || colorString.length === 0) return -2
         var hexList = colorString.split(",")
         if (hexList.length === 0) return -2
-        var total       = hexList.length
-        var weightedH   = 0
-        var totalSat    = 0
+        var total        = hexList.length
+        var weightedH    = 0
+        var totalSat     = 0
         var neutralCount = 0
         for (var i = 0; i < hexList.length; i++) {
-            var hex     = hexList[i].trim()
+            var hex      = hexList[i].trim()
             if (hex.length < 6) continue
-            var hsl     = hexToHsl(hex)
+            var hsl      = hexToHsl(hex)
             var vibrancy = hsl.s * (1 - Math.abs(2 * hsl.l - 1))
             if (hsl.s < 0.08 || hsl.l < 0.04 || hsl.l > 0.96) { neutralCount++; continue }
             weightedH += hsl.h * vibrancy
@@ -160,13 +160,13 @@ PanelWindow {
 
     function getRepresentativeColor(colorString) {
         if (!colorString || colorString.length === 0) return ""
-        var hexList  = colorString.split(",")
-        var bestHex  = ""
+        var hexList   = colorString.split(",")
+        var bestHex   = ""
         var bestScore = -1
         for (var i = 0; i < hexList.length; i++) {
-            var hex  = hexList[i].trim()
+            var hex      = hexList[i].trim()
             if (hex.length < 6) continue
-            var hsl  = hexToHsl(hex)
+            var hsl      = hexToHsl(hex)
             var vibrancy = hsl.s * (1 - Math.abs(2 * hsl.l - 1))
             if (hsl.s < 0.08 || hsl.l < 0.04 || hsl.l > 0.96) continue
             if (vibrancy > bestScore) { bestScore = vibrancy; bestHex = hex }
@@ -317,8 +317,8 @@ PanelWindow {
                     result.push(_wallsBuild[i])
                 }
             }
-            walls      = result
-            wallColors = Object.assign({}, wallColors)
+            walls       = result
+            wallColors  = Object.assign({}, wallColors)
             _wallsBuild = []
             if (ready) {
                 filterWalls(true)
@@ -353,6 +353,9 @@ PanelWindow {
             "  [ -L \"$f\" ] && continue",
             "  name=$(basename \"$f\")",
             "  grep -qF \"$name\" \"$CACHE/colors.tsv\" 2>/dev/null && continue",
+            "  thumb=\"$CACHE/${name}.thumb.jpg\"",
+            "  src=\"${f}[0]\"",
+            "  [ -f \"$thumb\" ] && src=\"$thumb\"",
             "  colors=''",
             "  while IFS= read -r line; do",
             "    count=$(echo \"$line\" | grep -oP '^\\s*\\K[0-9]+')",
@@ -366,7 +369,7 @@ PanelWindow {
             "    [ $lum -lt 3 ] && continue",
             "    [ $lum -gt 97 ] && continue",
             "    [ -z \"$colors\" ] && colors=\"$hex\" || colors=\"$colors,$hex\"",
-            "  done < <(magick \"${f}[0]\" -resize 200x200! -colors 12 -depth 8 -format '%c' histogram:info: 2>/dev/null | sort -rn)",
+            "  done < <(magick \"$src\" -resize 200x200! -colors 8 -depth 8 -format '%c' histogram:info: 2>/dev/null | sort -rn)",
             "  [ -z \"$colors\" ] && continue",
             "  printf '%s\\t%s\\n' \"$name\" \"$colors\" >> \"$CACHE/colors.tsv\"",
             "  echo \"${name}\t${colors}\"",
@@ -652,7 +655,7 @@ PanelWindow {
                     preferredHighlightBegin: (width - expandedWidth) / 2
                     preferredHighlightEnd:   (width + expandedWidth) / 2
                     highlight: Item {}
-                    cacheBuffer: 1500
+                    cacheBuffer: 600
 
                     header: Item { width: Math.max(0, (sliceList.width - expandedWidth) / 2 - 3); height: 1 }
                     footer: Item { width: Math.max(0, (sliceList.width - expandedWidth) / 2 - 3); height: 1 }
@@ -722,7 +725,7 @@ PanelWindow {
                                             source = "file://" + wallDir + "/" + sliceItem.modelData.name
                                     }
                                     fillMode: Image.PreserveAspectCrop
-                                    sourceSize.width: 400
+                                    sourceSize.width: sliceItem.isCurrent ? 800 : 120
                                     asynchronous: true
                                     cache: true
                                     visible: !sliceItem.fullLoaded && !sliceItem.gifLoaded
@@ -731,7 +734,7 @@ PanelWindow {
                                 Loader {
                                     id: fullLoader
                                     anchors.fill: parent
-                                    active: sliceItem.isCurrent && !sliceItem.isGif
+                                    active: sliceItem.isCurrent && !sliceItem.isGif && fullLoadDelay.triggered
                                     sourceComponent: Image {
                                         anchors.fill: parent
                                         source: "file://" + wallDir + "/" + sliceItem.modelData.name
@@ -740,6 +743,15 @@ PanelWindow {
                                         asynchronous: true
                                         cache: true
                                     }
+                                }
+
+                                Timer {
+                                    id: fullLoadDelay
+                                    property bool triggered: false
+                                    interval: 180
+                                    running: sliceItem.isCurrent
+                                    onTriggered: triggered = true
+                                    onRunningChanged: if (!running) triggered = false
                                 }
 
                                 Loader {
