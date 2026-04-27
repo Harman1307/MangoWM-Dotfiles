@@ -20,6 +20,7 @@ PanelWindow {
     property string currentWall: ""
     property int thumbVersion: 0
     property bool _skipInitialAnim: true
+    property bool searching: false
 
     property string cachePath: Quickshell.env("HOME") + "/.cache/wallpaper-thumbs"
     property string wallDir:   Quickshell.env("HOME") + "/wallpapers"
@@ -59,10 +60,12 @@ PanelWindow {
             searchInput.text  = ""
             _pendingColors    = {}
             _skipInitialAnim  = true
+            searching         = false
             ready             = false
             currentWallProc.running = true
         } else {
-            ready = false
+            ready     = false
+            searching = false
         }
     }
 
@@ -481,15 +484,16 @@ PanelWindow {
                             color: Colors.fg
                             font { pixelSize: 11; family: "JetBrainsMono Nerd Font" }
                             selectByMouse: true
+                            readOnly: !searching
                             clip: true
 
                             Text {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
-                                text:    "Search..."
+                                text:    searching ? "Search..." : "/ to search"
                                 color:   a(Colors.fg, 0.2)
                                 font:    parent.font
-                                visible: !parent.text && !parent.activeFocus
+                                visible: !parent.text
                             }
 
                             onTextChanged: {
@@ -498,30 +502,64 @@ PanelWindow {
                             }
 
                             Keys.onPressed: function(event) {
-                                if (event.key === Qt.Key_Left) {
-                                    if (selected > 0) selected--
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_Right) {
-                                    if (selected < filtered.length - 1) selected++
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_Home) {
-                                    selected = 0
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_End) {
-                                    selected = Math.max(0, filtered.length - 1)
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_PageUp) {
-                                    selected = Math.max(0, selected - 10)
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_PageDown) {
-                                    selected = Math.min(filtered.length - 1, selected + 10)
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                    if (filtered.length > 0) applyWallpaper(filtered[selected])
-                                    event.accepted = true
-                                } else if (event.key === Qt.Key_Escape) {
-                                    UIState.closeDropdowns()
-                                    event.accepted = true
+                                if (searching) {
+                                    if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                            if (filtered.length > 0) applyWallpaper(filtered[selected])
+                                        } else {
+                                            text = ""
+                                            query = ""
+                                            filterWalls()
+                                        }
+                                        searching = false
+                                        event.accepted = true
+                                    }
+                                } else {
+                                    if (event.key === Qt.Key_Slash) {
+                                        searching = true
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
+                                        if (selected > 0) selected--
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_L || event.key === Qt.Key_Right) {
+                                        if (selected < filtered.length - 1) selected++
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Home) {
+                                        selected = 0
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_End) {
+                                        selected = Math.max(0, filtered.length - 1)
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_PageUp) {
+                                        selected = Math.max(0, selected - 10)
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_PageDown) {
+                                        selected = Math.min(filtered.length - 1, selected + 10)
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                                        if (filtered.length > 0) applyWallpaper(filtered[selected])
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_BracketLeft) {
+                                        colorFilter = colorFilter <= 0
+                                            ? colorDots.length - 1
+                                            : colorFilter - 1
+                                        filterWalls()
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_BracketRight) {
+                                        colorFilter = colorFilter >= colorDots.length - 1
+                                            ? 0
+                                            : colorFilter + 1
+                                        filterWalls()
+                                        event.accepted = true
+                                    } else if (event.key === Qt.Key_Escape) {
+                                        if (colorFilter >= 0) {
+                                            colorFilter = -1
+                                            filterWalls()
+                                        } else {
+                                            UIState.closeDropdowns()
+                                        }
+                                        event.accepted = true
+                                    }
                                 }
                             }
                         }
