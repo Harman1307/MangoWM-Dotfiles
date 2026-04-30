@@ -12,10 +12,6 @@
 | **Wallpapers** | awww |
 | **Bar** | Quickshell |
 
-## Video Showcase
-
-![](./screenshots/video.png)
-
 ## Screenshots
 
 ![](./screenshots/1.png)
