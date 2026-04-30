@@ -504,18 +504,13 @@ PanelWindow {
                             Keys.onPressed: function(event) {
                                 if (searching) {
                                     if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                                            if (filtered.length > 0) applyWallpaper(filtered[selected])
-                                        } else {
-                                            text = ""
-                                            query = ""
-                                            filterWalls()
-                                        }
                                         searching = false
                                         event.accepted = true
                                     }
                                 } else {
                                     if (event.key === Qt.Key_Slash) {
+                                        text = ""
+                                        query = ""
                                         searching = true
                                         event.accepted = true
                                     } else if (event.key === Qt.Key_H || event.key === Qt.Key_Left) {
